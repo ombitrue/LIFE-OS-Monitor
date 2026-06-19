@@ -61,14 +61,22 @@ Positioning
   next_step: Keep build output reproducible and document exactly which files are generated versus source-controlled.
 
 - skill: Browser persistence clarity
+codex/rework-and-patch-repository-for-functionality-j4eai0
   level: 2
+
+  level: 1
+main
   confidence: medium
   evidence:
     - repository evidence: README states that data is stored in localStorage under l2_* keys.
     - code evidence: app contains defensive localStorage loading helpers.
+codex/rework-and-patch-repository-for-functionality-j4eai0
     - implementation evidence: DATA VAULT can export, import, and reset LIFE.OS backup v1 JSON data.
     - validation evidence: npm run typecheck completed after the data portability implementation.
   next_step: Validate recovery with an external user or reviewer before increasing this skill level again.
+
+  next_step: Add user-facing backup/reset/export guidance before increasing this skill level.
+main
 
 - skill: Launch documentation
   level: 2
@@ -124,16 +132,28 @@ current_capabilities:
   - The repository is small enough for manual inspection.
   - Core data behavior is documented as browser-local storage.
 missing_skills:
+codex/rework-and-patch-repository-for-functionality-j4eai0
   - external validation of data recovery
   - release packaging repeatability
   - external user validation
   - maintainable module boundaries beyond the current single app shell
 next_recommended_skill: release packaging repeatability
+
+  - durable data portability evidence
+  - release packaging repeatability
+  - external user validation
+  - maintainable module boundaries beyond the current single app shell
+next_recommended_skill: Browser persistence clarity
+main
 ```
 
 ## Next best development step
 
+codex/rework-and-patch-repository-for-functionality-j4eai0
 The next best step is reproducibility: add a release packaging script or checklist that consistently produces the source ZIP and static dist ZIP, then validate it with one reviewer or pilot user.
+
+Improve clarity before adding features: document or implement export/import/reset behavior for localStorage-backed data, then validate that a user can recover or move their LIFE.OS data intentionally.
+main
 
 This follows the priority order:
 

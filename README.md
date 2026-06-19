@@ -33,6 +33,7 @@ npm start
 ```
 
 The local server prints a URL, usually `http://localhost:4173/`. Open that URL in your browser. Stop it with `Ctrl+C`.
+codex/rework-and-patch-repository-for-functionality-j4eai0
 
 > Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
 
@@ -50,6 +51,25 @@ This writes the static browser app to `dist/`. The output includes `dist/index.h
 npm run typecheck
 ```
 
+
+
+> Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
+
+## Build a static local bundle
+
+```bash
+npm run build
+```
+
+This writes the static browser app to `dist/`. The output includes `dist/index.html`, `dist/main.js`, `dist/main.css`, sourcemaps, and copied public assets.
+
+## Type-check only
+
+```bash
+npm run typecheck
+```
+
+main
 Use this when you want TypeScript validation without generating a browser bundle.
 
 ## How local launch works
@@ -60,6 +80,7 @@ Use this when you want TypeScript validation without generating a browser bundle
 - A small Node HTTP server serves `dist/` at `http://localhost:4173/`.
 - `index.html` loads `/main.js`; it does not reference Vite or `/src/main.tsx`.
 
+ codex/rework-and-patch-repository-for-functionality-j4eai0
 
 ## Backup, import, and reset local data
 
@@ -95,6 +116,11 @@ Reset clears LIFE.OS `l2_*` keys from the current browser and returns the app to
 ## Data and permissions
 
 - LIFE.OS stores data in browser `localStorage` using `l2_*` keys. The in-app DATA VAULT can export, import, or reset those keys intentionally.
+
+## Data and permissions
+
+- LIFE.OS stores data in browser `localStorage` using `l2_*` keys.
+main
 - No backend server or database is required.
 - Weather is optional. If the browser blocks geolocation or the weather request fails, the app continues running and shows the scanning fallback state.
 - Pomodoro audio is optional. Browsers may block audio until the user interacts with the page.
@@ -105,7 +131,11 @@ Reset clears LIFE.OS `l2_*` keys from the current browser and returns the app to
 | --- | --- | --- |
 | `index.html` | Static browser entry document | Defines the root element, favicon, metadata, and local bundle script. |
 | `src/main.tsx` | React bootstrap | Mounts the React app and imports global styles. |
+codex/rework-and-patch-repository-for-functionality-j4eai0
 | `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, data vault export/import/reset, scoring, Pomodoro logic, and UI panels. |
+
+| `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, scoring, Pomodoro logic, and UI panels. |
+ main
 | `src/index.css` | Global stylesheet | Provides the app reset, dark baseline, sizing, and focus states. |
 | `src/app-env.d.ts` | Browser type extensions | Adds the WebKit audio fallback type. |
 | `scripts/build.mjs` | Production build script | Creates the static `dist/` bundle without Vite. |

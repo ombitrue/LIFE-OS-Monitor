@@ -71,6 +71,7 @@ Drift: Low Drift, Medium Drift, or High Drift with explanation.
 ```
 
 Do not rewrite the snapshot above. Add outcomes and drift notes below it.
+codex/rework-and-patch-repository-for-functionality-j4eai0
 
 ## Maintenance note — 2026-06-19 data portability clarity
 
@@ -82,3 +83,4 @@ strategic_drift: Low Drift - the work strengthens local-first preservation rathe
 ```
 
 This note does not replace the original snapshot. It records observed movement against the capsule's preservation layer.
+main
