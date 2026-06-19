@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+// LIFE.OS Monitor app shell: dashboard state, persistence, scoring, and UI panels.
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type Rank = "S" | "A" | "B" | "C";
 type Theme = "green" | "red" | "purple" | "cyan";
@@ -36,6 +37,21 @@ const THEMES: Record<Theme, { primary: string; bgGradient: string }> = {
   purple: { primary: "#a855f7", bgGradient: "rgba(168,85,247,0.02)" },
   cyan:   { primary: "#06b6d4", bgGradient: "rgba(6,182,212,0.02)" },
 };
+
+function loadJson<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? (JSON.parse(saved) as T) : fallback;
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
+}
+
+function loadNumber(key: string, fallback = 0): number {
+  const value = Number(localStorage.getItem(key));
+  return Number.isFinite(value) ? value : fallback;
+}
 
 function daysLeft(dt: string | null): number | null {
   if (!dt) return null;
@@ -92,28 +108,25 @@ function MatrixRain({ theme }: { theme: Theme }) {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("l2_theme") as Theme) || "green");
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem("l2_theme") as Theme | null;
+    return saved && saved in THEMES ? saved : "green";
+  });
   const tc = THEMES[theme];
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem("l2_tasks");
-    return saved ? JSON.parse(saved) : [
-      { id: 1, title: "Deploy system patch v2.5", rank: "S", category: "Side Project", dueDate: "2026-06-20", done: false },
-      { id: 2, title: "Analyze financial assets", rank: "B", category: "Finance", dueDate: "2026-06-18", done: false },
-    ];
-  });
+  const [tasks, setTasks] = useState<Task[]>(() => loadJson<Task[]>("l2_tasks", [
+    { id: 1, title: "Deploy system patch v2.5", rank: "S", category: "Side Project", dueDate: "2026-06-20", done: false },
+    { id: 2, title: "Analyze financial assets", rank: "B", category: "Finance", dueDate: "2026-06-18", done: false },
+  ]));
 
-  const [habits, setHabits] = useState<Habit[]>(() => {
-    const saved = localStorage.getItem("l2_habits");
-    return saved ? JSON.parse(saved) : [
-      { id: 1, title: "Coding drill (1hr)", done: false, streak: 3 },
-      { id: 2, title: "Gym / Cardio session", done: false, streak: 0 },
-    ];
-  });
+  const [habits, setHabits] = useState<Habit[]>(() => loadJson<Habit[]>("l2_habits", [
+    { id: 1, title: "Coding drill (1hr)", done: false, streak: 3 },
+    { id: 2, title: "Gym / Cardio session", done: false, streak: 0 },
+  ]));
 
   const [notes, setNotes] = useState<string>(() => localStorage.getItem("l2_notes") || "// SYSTEM SECURE JOURNAL\n- Draft new items here...\n- Insights auto-saved.");
-  const [userXp, setUserXp] = useState<number>(() => Number(localStorage.getItem("l2_xp")) || 0);
-  const [streak, setStreak] = useState<number>(() => Number(localStorage.getItem("l2_streak")) || 0);
+  const [userXp, setUserXp] = useState<number>(() => loadNumber("l2_xp"));
+  const [streak, setStreak] = useState<number>(() => loadNumber("l2_streak"));
 
   const [catF, setCatF] = useState<string>("All");
   const [rankF, setRankF] = useState<string>("All");
@@ -147,18 +160,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    let timer: any = null;
+    let timer: number | null = null;
     if (pomoActive && pomoSeconds > 0) {
-      timer = setInterval(() => setPomoSeconds(s => s - 1), 1000);
+      timer = window.setInterval(() => setPomoSeconds(s => s - 1), 1000);
     } else if (pomoActive && pomoSeconds === 0) {
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-        osc.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.25);
-      } catch {}
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextCtor) {
+          const ctx = new AudioContextCtor();
+          const osc = ctx.createOscillator();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+          osc.connect(ctx.destination);
+          osc.start(); osc.stop(ctx.currentTime + 0.25);
+        }
+      } catch {
+        // Audio is optional and may be blocked until the user interacts with the page.
+      }
 
       if (pomoMode === "WORK") {
         setPomoMode("BREAK"); setPomoSeconds(5 * 60); setUserXp(p => p + 50);
@@ -167,7 +185,7 @@ export default function App() {
       }
       setPomoActive(false);
     }
-    return () => clearInterval(timer);
+    return () => { if (timer !== null) window.clearInterval(timer); };
   }, [pomoActive, pomoSeconds, pomoMode]);
 
   useEffect(() => {
@@ -175,16 +193,24 @@ export default function App() {
       try {
         const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
         const d = await r.json(); setWeather(d.current_weather);
-      } catch {}
-    });
+      } catch {
+        setWeather(null);
+      }
+    }, () => setWeather(null), { timeout: 5000 });
   }, []);
+
+  const formatPomo = () => {
+    const minutes = Math.floor(pomoSeconds / 60).toString().padStart(2, "0");
+    const seconds = (pomoSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
 
   const currentLevel = getLevel(userXp);
   const xpRequiredForNext = getXpForNextLevel(currentLevel);
   const xpCurrentLevelBase = getXpForNextLevel(currentLevel - 1);
   const xpPercent = Math.min(100, Math.max(0, ((userXp - xpCurrentLevelBase) / (xpRequiredForNext - xpCurrentLevelBase)) * 100));
 
-  const scored = [...tasks].map(t => ({ ...t, score: urgencyScore(t) })).sort((a,b) => (b.score || 0) - (a.score || 0));
+  const scored = useMemo(() => [...tasks].map(t => ({ ...t, score: urgencyScore(t) })).sort((a,b) => (b.score || 0) - (a.score || 0)), [tasks]);
   const urgent = scored.filter(t => !t.done).slice(0, 2);
   const shown  = scored.filter(t => (catF === "All" || t.category === catF) && (rankF === "All" || t.rank === rankF));
 
@@ -199,6 +225,12 @@ export default function App() {
       }
       return t;
     }));
+  };
+
+  const beginEditTask = (task: Task) => {
+    setEditId(task.id);
+    setDraft({ title: task.title, rank: task.rank, category: task.category, dueDate: task.dueDate });
+    setShowAdd(true);
   };
 
   const saveTask = () => {
@@ -233,7 +265,7 @@ export default function App() {
   const G = {
     app:  { minHeight:"100vh", background:"#0a0b10", color:"#e5e7eb", fontFamily:"system-ui, -apple-system, sans-serif", padding:"20px", position:"relative" } as React.CSSProperties,
     scan: { position:"fixed", inset:0, backgroundImage:"linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03))", backgroundSize:"100% 4px, 6px 100%", pointerEvents:"none", zIndex:1 } as React.CSSProperties,
-    panel: (accent = tc.primary) => ({ background:`#11131e`, border:`1px solid #1f2335`, borderRadius:"6px", padding:"16px", marginBottom:"12px", boxShadow:`0 4px 20px rgba(0,0,0,0.4)` }) as React.CSSProperties,
+    panel: (accent = tc.primary) => ({ background:`#11131e`, border:`1px solid ${accent}33`, borderRadius:"6px", padding:"16px", marginBottom:"12px", boxShadow:`0 4px 20px rgba(0,0,0,0.4)` }) as React.CSSProperties,
     ptitle:(accent = tc.primary) => ({ fontSize:"11px", fontFamily:"monospace", letterSpacing:"1px", color:accent, marginBottom:"12px", paddingBottom:"6px", borderBottom:`1px solid #1f2335`, fontWeight:"bold" }) as React.CSSProperties,
     btn:  (active: boolean, accent = tc.primary) => ({ background: active?`${accent}22`:"#1a1d2e", border:`1px solid ${active?accent:"#2e344f"}`, color:active?accent:"#9ca3af", padding:"5px 12px", borderRadius:"4px", cursor:"pointer", fontSize:"11px", fontWeight:500, fontFamily:"system-ui", transition:"all 0.15s ease" }),
     inp:  { background:"#161925", border:`1px solid #2e344f`, color:"#ffffff", padding:"8px 12px", borderRadius:"4px", fontFamily:"system-ui", fontSize:"13px", outline:"none", boxSizing:"border-box" } as React.CSSProperties,
@@ -244,11 +276,11 @@ export default function App() {
       <style>{`
         body { margin: 0; background: #0a0b10; }
         textarea::placeholder, input::placeholder { color: #4b5563 !important; }
-        select { background:#161925; border:1px solid #2e344f; color:#ffffff; font-size:12px; padding:6px; borderRadius:4px; outline:none; }
+        select { background:#161925; border:1px solid #2e344f; color:#ffffff; font-size:12px; padding:6px; border-radius:4px; outline:none; }
         button:hover { filter: brightness(1.15); }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0a0b10; }
-        ::-webkit-scrollbar-thumb { background: #2e344f; borderRadius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #2e344f; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: ${tc.primary}; }
       `}</style>
 
@@ -327,7 +359,7 @@ export default function App() {
                 <input name="hTitle" style={{ ...G.inp, flex:1, padding:"5px 10px", fontSize:"12px" }} placeholder="New daily goal..." />
                 <button type="submit" style={G.btn(true)}>+</button>
               </form>
-              <div style={{ maxHeight:"100px", overflowY:"auto", pr:"4px" }}>
+              <div style={{ maxHeight:"100px", overflowY:"auto", paddingRight:"4px" }}>
                 {habits.length === 0 && <div style={{fontSize:"11px", color:"#4b5563"}}>No protocols injected yet.</div>}
                 {habits.map(h => (
                   <div key={h.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:"13px", padding:"6px 0", borderBottom:`1px solid #1f2335` }}>
@@ -395,14 +427,18 @@ export default function App() {
               )}
 
               {/* FILTERS */}
-              <div style={{ display:"flex", gap:"5px", marginBottom:"12px", flexWrap:"wrap" }}>
+              <div style={{ display:"flex", gap:"5px", marginBottom:"8px", flexWrap:"wrap" }}>
                 <button style={G.btn(catF==="All")} onClick={()=>setCatF("All")}>ALL</button>
                 {CATS.map(c => <button key={c} style={G.btn(catF===c)} onClick={()=>setCatF(c)}>{c.toUpperCase()}</button>)}
+              </div>
+              <div style={{ display:"flex", gap:"5px", marginBottom:"12px", flexWrap:"wrap" }}>
+                <button style={G.btn(rankF==="All")} onClick={()=>setRankF("All")}>ALL RANKS</button>
+                {(["S", "A", "B", "C"] as Rank[]).map(r => <button key={r} style={G.btn(rankF===r, RANK_COLOR[r])} onClick={()=>setRankF(r)}>{r}-RANK</button>)}
               </div>
 
               {/* TASKS LOG */}
               <div style={{ maxHeight:"260px", overflowY:"auto" }}>
-                {shown.length === 0 && <div style={{fontSize:"12px", color:"#4b5563", py:2}}>No matching vector data found.</div>}
+                {shown.length === 0 && <div style={{fontSize:"12px", color:"#4b5563", paddingBlock:"8px"}}>No matching vector data found.</div>}
                 {shown.map(t => {
                   const d = daysLeft(t.dueDate);
                   return (
@@ -412,7 +448,8 @@ export default function App() {
                       <span style={{ flex:1, fontSize:"13px", textDecoration:t.done?"line-through":"none", color:t.done?"#4b5563":"#ffffff" }}>{t.title}</span>
                       <span style={{ fontSize:"11px", color:"#9ca3af", background:"#161925", padding:"1px 6px", borderRadius:"4px" }}>{t.category}</span>
                       {d !== null && <span style={{ fontSize:"11px", fontFamily:"monospace", color:d<=0?"#ef4444":"#6b7280" }}>{d<=0?"OVERDUE":`${d}d left`}</span>}
-                      <button onClick={() => setTasks(p=>p.filter(x=>x.id!==t.id))} style={{ background:"transparent", border:"none", color:"#ef4444", cursor:"pointer", fontSize:"16px", padding:"0 4px" }}>×</button>
+                      <button onClick={() => beginEditTask(t)} style={{ background:"transparent", border:"none", color:tc.primary, cursor:"pointer", fontSize:"11px", padding:"0 4px" }}>EDIT</button>
+                      <button onClick={() => setTasks(p=>p.filter(x=>x.id!==t.id))} style={{ background:"transparent", border:"none", color:"#ef4444", cursor:"pointer", fontSize:"16px", padding:"0 4px" }} aria-label={`Delete ${t.title}`}>×</button>
                     </div>
                   );
                 })}

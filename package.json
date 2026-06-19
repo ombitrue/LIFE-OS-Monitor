@@ -1,12 +1,12 @@
 {
-  "name": "life-os",
+  "name": "life-os-monitor",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "start": "node scripts/dev-server.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -15,8 +15,8 @@
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "typescript": "^5.4.5",
-    "vite": "^5.4.2"
-  }
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  },
+  "description": "Browser-only LIFE.OS personal command deck built with plain React and a local esbuild script."
 }
