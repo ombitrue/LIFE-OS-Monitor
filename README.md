@@ -33,6 +33,7 @@ npm start
 ```
 
 The local server prints a URL, usually `http://localhost:4173/`. Open that URL in your browser. Stop it with `Ctrl+C`.
+codex/rework-and-patch-repository-for-functionality-j4eai0
 
 > Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
 
@@ -50,6 +51,25 @@ This writes the static browser app to `dist/`. The output includes `dist/index.h
 npm run typecheck
 ```
 
+
+
+> Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
+
+## Build a static local bundle
+
+```bash
+npm run build
+```
+
+This writes the static browser app to `dist/`. The output includes `dist/index.html`, `dist/main.js`, `dist/main.css`, sourcemaps, and copied public assets.
+
+## Type-check only
+
+```bash
+npm run typecheck
+```
+
+main
 Use this when you want TypeScript validation without generating a browser bundle.
 
 ## How local launch works
@@ -60,9 +80,47 @@ Use this when you want TypeScript validation without generating a browser bundle
 - A small Node HTTP server serves `dist/` at `http://localhost:4173/`.
 - `index.html` loads `/main.js`; it does not reference Vite or `/src/main.tsx`.
 
+ codex/rework-and-patch-repository-for-functionality-j4eai0
+
+## Backup, import, and reset local data
+
+LIFE.OS data lives in browser `localStorage`, so the browser profile controls where the data exists. Use the in-app **DATA VAULT** panel before changing browsers, clearing site data, or moving to another machine.
+
+### Export a backup
+
+1. Open the app with `npm start`.
+2. Find the **DATA VAULT** panel.
+3. Select **Export JSON**.
+4. Save the downloaded `life-os-backup-YYYY-MM-DD.json` file somewhere safe.
+
+The backup includes quests, habits, notes, XP, streak, theme, and the habit reset date.
+
+### Import a backup
+
+1. Open the app in the browser where you want the data restored.
+2. Find the **DATA VAULT** panel.
+3. Select **Import JSON**.
+4. Choose a `life-os-monitor.backup.v1` JSON file created by LIFE.OS.
+5. Review quests and habits after import before continuing work.
+
+Import replaces the active in-browser state with the backup contents. Export the current browser state first if you may need it later.
+
+### Reset local data
+
+1. Export a backup first if you need to preserve the current state.
+2. Select **Reset Local Data** in the **DATA VAULT** panel.
+3. Confirm the browser prompt.
+
+Reset clears LIFE.OS `l2_*` keys from the current browser and returns the app to an empty local state. You can recover previous data only by importing a backup JSON file.
+
+## Data and permissions
+
+- LIFE.OS stores data in browser `localStorage` using `l2_*` keys. The in-app DATA VAULT can export, import, or reset those keys intentionally.
+
 ## Data and permissions
 
 - LIFE.OS stores data in browser `localStorage` using `l2_*` keys.
+main
 - No backend server or database is required.
 - Weather is optional. If the browser blocks geolocation or the weather request fails, the app continues running and shows the scanning fallback state.
 - Pomodoro audio is optional. Browsers may block audio until the user interacts with the page.
@@ -73,7 +131,11 @@ Use this when you want TypeScript validation without generating a browser bundle
 | --- | --- | --- |
 | `index.html` | Static browser entry document | Defines the root element, favicon, metadata, and local bundle script. |
 | `src/main.tsx` | React bootstrap | Mounts the React app and imports global styles. |
+codex/rework-and-patch-repository-for-functionality-j4eai0
+| `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, data vault export/import/reset, scoring, Pomodoro logic, and UI panels. |
+
 | `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, scoring, Pomodoro logic, and UI panels. |
+ main
 | `src/index.css` | Global stylesheet | Provides the app reset, dark baseline, sizing, and focus states. |
 | `src/app-env.d.ts` | Browser type extensions | Adds the WebKit audio fallback type. |
 | `scripts/build.mjs` | Production build script | Creates the static `dist/` bundle without Vite. |

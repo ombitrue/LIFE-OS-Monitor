@@ -27,9 +27,24 @@ interface WeatherData {
   weathercode: number;
 }
 
+interface LifeOsBackup {
+  schema: "life-os-monitor.backup.v1";
+  exportedAt: string;
+  data: {
+    tasks: Task[];
+    habits: Habit[];
+    notes: string;
+    userXp: number;
+    streak: number;
+    theme: Theme;
+    habitDate: string | null;
+  };
+}
+
 const RANK_WEIGHT: Record<Rank, number> = { S: 100, A: 70, B: 40, C: 15 };
 const RANK_COLOR: Record<Rank, string>  = { S: "#ef4444", A: "#f97316", B: "#22c55e", C: "#06b6d4" };
 const CATS = ["Work", "Health", "Personal", "Learning", "Finance", "Fitness", "Side Project"];
+const STORAGE_KEYS = ["l2_theme", "l2_tasks", "l2_habits", "l2_notes", "l2_xp", "l2_streak", "l2_habit_date"] as const;
 
 const THEMES: Record<Theme, { primary: string; bgGradient: string }> = {
   green:  { primary: "#22c55e", bgGradient: "rgba(34,197,94,0.02)" },
@@ -134,6 +149,8 @@ export default function App() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showAdd, setShowAdd] = useState<boolean>(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [dataStatus, setDataStatus] = useState<string>("Ready to export, import, or reset local data.");
+  const importRef = useRef<HTMLInputElement>(null);
 
   const blank: Omit<Task, "id" | "done"> = { title:"", rank:"B", category:"Work", dueDate:"" };
   const [draft, setDraft] = useState<Omit<Task, "id" | "done">>(blank);
@@ -241,6 +258,81 @@ export default function App() {
       setTasks(p => [...p, { ...draft, id: Date.now(), done: false }]);
     }
     setDraft(blank); setShowAdd(false);
+  };
+
+  const exportLifeOsData = () => {
+    const backup: LifeOsBackup = {
+      schema: "life-os-monitor.backup.v1",
+      exportedAt: new Date().toISOString(),
+      data: {
+        tasks,
+        habits,
+        notes,
+        userXp,
+        streak,
+        theme,
+        habitDate: localStorage.getItem("l2_habit_date"),
+      },
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `life-os-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setDataStatus("Backup exported as JSON. Keep it somewhere safe before resetting browser data.");
+  };
+
+  const importLifeOsData = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const backup = JSON.parse(await file.text()) as Partial<LifeOsBackup>;
+      if (backup.schema !== "life-os-monitor.backup.v1" || !backup.data) {
+        setDataStatus("Import failed: this is not a LIFE.OS backup v1 file.");
+        return;
+      }
+      const nextTheme = backup.data.theme && backup.data.theme in THEMES ? backup.data.theme : "green";
+      const nextTasks = Array.isArray(backup.data.tasks) ? backup.data.tasks : [];
+      const nextHabits = Array.isArray(backup.data.habits) ? backup.data.habits : [];
+      const nextNotes = typeof backup.data.notes === "string" ? backup.data.notes : "";
+      const nextXp = Number.isFinite(backup.data.userXp) ? backup.data.userXp : 0;
+      const nextStreak = Number.isFinite(backup.data.streak) ? backup.data.streak : 0;
+
+      setTheme(nextTheme);
+      setTasks(nextTasks);
+      setHabits(nextHabits);
+      setNotes(nextNotes);
+      setUserXp(nextXp);
+      setStreak(nextStreak);
+      if (backup.data.habitDate) {
+        localStorage.setItem("l2_habit_date", backup.data.habitDate);
+      } else {
+        localStorage.removeItem("l2_habit_date");
+      }
+      setDataStatus(`Imported backup from ${backup.exportedAt ?? "an unknown time"}. Review quests and habits before continuing.`);
+    } catch {
+      setDataStatus("Import failed: the selected file could not be read as valid JSON.");
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
+
+  const resetLifeOsData = () => {
+    const confirmed = window.confirm("Reset all LIFE.OS local data on this browser? Export a backup first if you need to keep it.");
+    if (!confirmed) return;
+    STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+    setTheme("green");
+    setTasks([]);
+    setHabits([]);
+    setNotes("// SYSTEM SECURE JOURNAL\n- Fresh local data store initialized.");
+    setUserXp(0);
+    setStreak(0);
+    setCatF("All");
+    setRankF("All");
+    setShowAdd(false);
+    setEditId(null);
+    setDataStatus("Local LIFE.OS data reset on this browser. Import a backup to recover previous data.");
   };
 
   const addHabit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -373,6 +465,27 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* DATA PORTABILITY */}
+            <div style={G.panel("#06b6d4")}>
+              <div style={G.ptitle("#06b6d4")}>// DATA VAULT</div>
+              <p style={{ fontSize:"12px", color:"#9ca3af", lineHeight:1.5, marginBottom:"10px" }}>
+                Export before moving browsers or resetting storage. Import restores quests, habits, notes, XP, streak, theme, and habit date.
+              </p>
+              <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"8px" }}>
+                <button style={G.btn(true, "#06b6d4")} onClick={exportLifeOsData}>Export JSON</button>
+                <button style={G.btn(false, "#06b6d4")} onClick={() => importRef.current?.click()}>Import JSON</button>
+                <button style={G.btn(false, "#ef4444")} onClick={resetLifeOsData}>Reset Local Data</button>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={e => void importLifeOsData(e.target.files?.[0])}
+                  style={{ display:"none" }}
+                />
+              </div>
+              <div style={{ fontSize:"11px", color:"#6b7280", fontFamily:"monospace", lineHeight:1.4 }}>{dataStatus}</div>
             </div>
 
           </div>

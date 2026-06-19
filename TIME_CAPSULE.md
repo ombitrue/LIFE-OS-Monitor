@@ -71,3 +71,16 @@ Drift: Low Drift, Medium Drift, or High Drift with explanation.
 ```
 
 Do not rewrite the snapshot above. Add outcomes and drift notes below it.
+codex/rework-and-patch-repository-for-functionality-j4eai0
+
+## Maintenance note — 2026-06-19 data portability clarity
+
+```yaml
+actual_change: Added in-app DATA VAULT behavior for exporting, importing, and resetting localStorage-backed LIFE.OS data.
+expected_vs_actual: The original expectation favored clarity and reproducibility before additional feature complexity; this change aligns with that expectation.
+prediction_accuracy: too_early_to_score
+strategic_drift: Low Drift - the work strengthens local-first preservation rather than moving the project toward hosted infrastructure.
+```
+
+This note does not replace the original snapshot. It records observed movement against the capsule's preservation layer.
+main
