@@ -1,3 +1,4 @@
+// LIFE.OS Monitor bootstrap: mounts the React application for the static local bundle.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
