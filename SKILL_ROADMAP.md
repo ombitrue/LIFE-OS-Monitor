@@ -60,6 +60,14 @@ Positioning
     - validation evidence: npm run build completed successfully in the working environment.
   next_step: Keep build output reproducible and document exactly which files are generated versus source-controlled.
 
+
+- skill: Analytics correctness
+  status: fixed
+  confidence: medium
+  evidence:
+    - implementation evidence: XP deltas now use persisted snapshots only, urgency scoring includes real time pressure, and daily protocols reset by local calendar date.
+  next_step: Gather real user history over multiple days before expanding analytics claims.
+
 - skill: Browser persistence clarity
 codex/rework-and-patch-repository-for-functionality-j4eai0
   level: 2

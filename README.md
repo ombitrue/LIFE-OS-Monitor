@@ -148,3 +148,15 @@ codex/rework-and-patch-repository-for-functionality-j4eai0
 ## Cleaned repository notes
 
 Unused starter template assets and Vite-specific files were removed so the repository only keeps files used by the local React app or its build/launch pipeline.
+
+## OMBiWEB Node integration
+
+LIFE-OS Monitor includes a modular **OMBiWEB Node panel** — a connection point
+for future n8n automation workflows.
+
+The panel (bottom-right corner) allows setting a webhook URL. When configured,
+the `Sync` button will POST the current app state (quests, XP, habits, focus log)
+to your n8n instance for further processing, distribution, or cross-app routing.
+
+Current status: **local-only**. The panel stores the webhook URL in `localStorage`
+and logs sync events. Network sync requires a running n8n instance.
