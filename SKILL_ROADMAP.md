@@ -50,7 +50,7 @@ Positioning
   evidence:
     - merged PR evidence: converted the app away from Vite-specific runtime assumptions into a local static React bundle served by a Node script.
     - repository evidence: README documents no backend, no database, and localStorage behavior.
-  next_step: Add explicit export/import guidance or implementation before claiming durable local data portability.
+  next_step: Validate backup import/export recovery with an external user or reviewer.
 
 - skill: Static build packaging
   level: 2
@@ -60,23 +60,24 @@ Positioning
     - validation evidence: npm run build completed successfully in the working environment.
   next_step: Keep build output reproducible and document exactly which files are generated versus source-controlled.
 
-- skill: Browser persistence clarity
-codex/rework-and-patch-repository-for-functionality-j4eai0
+- skill: Analytics correctness
   level: 2
+  status: fixed
+  confidence: medium
+  evidence:
+    - implementation evidence: XP deltas now use persisted snapshots only.
+    - implementation evidence: urgency scoring includes real hours-left pressure.
+    - implementation evidence: daily protocols reset by local calendar date.
+  next_step: Gather real user history over multiple days before expanding analytics claims.
 
-  level: 1
-main
+- skill: Browser persistence clarity
+  level: 2
   confidence: medium
   evidence:
     - repository evidence: README states that data is stored in localStorage under l2_* keys.
     - code evidence: app contains defensive localStorage loading helpers.
-codex/rework-and-patch-repository-for-functionality-j4eai0
     - implementation evidence: DATA VAULT can export, import, and reset LIFE.OS backup v1 JSON data.
-    - validation evidence: npm run typecheck completed after the data portability implementation.
   next_step: Validate recovery with an external user or reviewer before increasing this skill level again.
-
-  next_step: Add user-facing backup/reset/export guidance before increasing this skill level.
-main
 
 - skill: Launch documentation
   level: 2
@@ -132,54 +133,13 @@ current_capabilities:
   - The repository is small enough for manual inspection.
   - Core data behavior is documented as browser-local storage.
 missing_skills:
-codex/rework-and-patch-repository-for-functionality-j4eai0
-  - external validation of data recovery
-  - release packaging repeatability
-  - external user validation
-  - maintainable module boundaries beyond the current single app shell
-next_recommended_skill: release packaging repeatability
-
   - durable data portability evidence
   - release packaging repeatability
   - external user validation
   - maintainable module boundaries beyond the current single app shell
 next_recommended_skill: Browser persistence clarity
-main
 ```
 
 ## Next best development step
 
-codex/rework-and-patch-repository-for-functionality-j4eai0
-The next best step is reproducibility: add a release packaging script or checklist that consistently produces the source ZIP and static dist ZIP, then validate it with one reviewer or pilot user.
-
-Improve clarity before adding features: document or implement export/import/reset behavior for localStorage-backed data, then validate that a user can recover or move their LIFE.OS data intentionally.
-main
-
-This follows the priority order:
-
-```text
-clarity
-→ reproducibility
-→ external conversation
-→ pilot signal
-```
-
-## Update rules for future merged PRs
-
-1. Identify affected skills.
-2. Update evidence chain.
-3. Update confidence only when evidence justifies it.
-4. Update capability signals.
-5. Update the next recommended skill.
-6. Do not inflate progress from intention or speculation.
-7. Keep language conservative.
-
-## Core principle
-
-Capabilities produce execution.
-
-Execution produces evidence.
-
-Evidence justifies progress.
-
-Progress does not come from claims.
+Validate the backup/export/import path with real browser data, then add a small troubleshooting section for launch and browser permission issues.

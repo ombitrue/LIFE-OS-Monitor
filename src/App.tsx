@@ -4,6 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 type Rank = "S" | "A" | "B" | "C";
 type Theme = "green" | "red" | "purple" | "cyan";
 
+interface TaskCompletionSnapshot {
+  ts: number;
+  dueDate: string;
+  completedOnTime: boolean;
+}
+
 interface Task {
   id: number;
   title: string;
@@ -12,6 +18,7 @@ interface Task {
   dueDate: string;
   done: boolean;
   score?: number;
+  completionHistory?: TaskCompletionSnapshot[];
 }
 
 interface Habit {
@@ -19,6 +26,20 @@ interface Habit {
   title: string;
   done: boolean;
   streak: number;
+}
+
+interface XPSnapshot {
+  ts: number;
+  xp: number;
+  level: number;
+  streak: number;
+}
+
+interface FocusEntry {
+  ts: number;
+  type: "work" | "break";
+  durationSec: number;
+  completed: boolean;
 }
 
 interface WeatherData {
@@ -38,13 +59,25 @@ interface LifeOsBackup {
     streak: number;
     theme: Theme;
     habitDate: string | null;
+    xp_history: XPSnapshot[];
+    focus_log: FocusEntry[];
   };
+}
+
+interface OmbiWebState {
+  tasks: Task[];
+  habits: Habit[];
+  notes: string;
+  userXp: number;
+  streak: number;
+  xpHistory: XPSnapshot[];
+  focusLog: FocusEntry[];
 }
 
 const RANK_WEIGHT: Record<Rank, number> = { S: 100, A: 70, B: 40, C: 15 };
 const RANK_COLOR: Record<Rank, string>  = { S: "#ef4444", A: "#f97316", B: "#22c55e", C: "#06b6d4" };
 const CATS = ["Work", "Health", "Personal", "Learning", "Finance", "Fitness", "Side Project"];
-const STORAGE_KEYS = ["l2_theme", "l2_tasks", "l2_habits", "l2_notes", "l2_xp", "l2_streak", "l2_habit_date"] as const;
+const STORAGE_KEYS = ["l2_theme", "l2_tasks", "l2_habits", "l2_notes", "l2_xp", "l2_streak", "l2_habit_date", "l2_xp_history", "l2_focus_log", "l2_ombi_webhook"] as const;
 
 const THEMES: Record<Theme, { primary: string; bgGradient: string }> = {
   green:  { primary: "#22c55e", bgGradient: "rgba(34,197,94,0.02)" },
@@ -76,12 +109,33 @@ function daysLeft(dt: string | null): number | null {
 }
 
 function urgencyScore(t: Omit<Task, "id" | "done">): number {
-  const r = RANK_WEIGHT[t.rank] || 0;
-  if (!t.dueDate) return r;
-  const d = daysLeft(t.dueDate);
-  if (d === null) return r;
-  const ds = d <= 0 ? 200 : d === 1 ? 150 : d <= 3 ? 100 : d <= 7 ? 60 : 20;
-  return r + ds;
+  const baseRankScore = RANK_WEIGHT[t.rank] || 0;
+  if (!t.dueDate) return baseRankScore;
+  const dueDate = new Date(`${t.dueDate}T23:59:59`);
+  const hoursLeft = (dueDate.getTime() - Date.now()) / 3600000;
+  const timePressure = hoursLeft < 24 ? 3.0 :
+                       hoursLeft < 72 ? 1.8 :
+                       hoursLeft < 168 ? 1.2 : 1.0;
+  return Math.round(baseRankScore * timePressure);
+}
+
+function isCompletedOnTime(dueDate: string, completedAt: number): boolean {
+  if (!dueDate) return true;
+  return completedAt <= new Date(`${dueDate}T23:59:59`).getTime();
+}
+
+function questCompletionRate(task: Task): number | null {
+  const history = task.completionHistory ?? [];
+  if (history.length < 3) return null;
+  const onTime = history.filter(entry => entry.completedOnTime).length;
+  return Math.round((onTime / history.length) * 100);
+}
+
+function syncToOMBiWEB(state: OmbiWebState, webhookUrl: string): string {
+  void state;
+  void webhookUrl;
+  // TODO: POST to webhookUrl with the current LIFE.OS state snapshot.
+  return "Synced locally — n8n endpoint not configured";
 }
 
 const getLevel = (xp: number) => Math.floor(Math.sqrt(xp / 100)) + 1;
@@ -142,6 +196,12 @@ export default function App() {
   const [notes, setNotes] = useState<string>(() => localStorage.getItem("l2_notes") || "// SYSTEM SECURE JOURNAL\n- Draft new items here...\n- Insights auto-saved.");
   const [userXp, setUserXp] = useState<number>(() => loadNumber("l2_xp"));
   const [streak, setStreak] = useState<number>(() => loadNumber("l2_streak"));
+  const [xpHistory, setXpHistory] = useState<XPSnapshot[]>(() => loadJson<XPSnapshot[]>("l2_xp_history", []));
+  const [focusLog, setFocusLog] = useState<FocusEntry[]>(() => loadJson<FocusEntry[]>("l2_focus_log", []));
+  const [ombiWebhook, setOmbiWebhook] = useState<string>(() => localStorage.getItem("l2_ombi_webhook") || "");
+  const [ombiOpen, setOmbiOpen] = useState<boolean>(true);
+  const [ombiStatus, setOmbiStatus] = useState<string>("Node offline — local-only mode.");
+  const [toast, setToast] = useState<string | null>(null);
 
   const [catF, setCatF] = useState<string>("All");
   const [rankF, setRankF] = useState<string>("All");
@@ -165,14 +225,19 @@ export default function App() {
   useEffect(() => { localStorage.setItem("l2_notes", notes); }, [notes]);
   useEffect(() => { localStorage.setItem("l2_xp", userXp.toString()); }, [userXp]);
   useEffect(() => { localStorage.setItem("l2_streak", streak.toString()); }, [streak]);
+  useEffect(() => { localStorage.setItem("l2_xp_history", JSON.stringify(xpHistory)); }, [xpHistory]);
+  useEffect(() => { localStorage.setItem("l2_focus_log", JSON.stringify(focusLog)); }, [focusLog]);
+  useEffect(() => { localStorage.setItem("l2_ombi_webhook", ombiWebhook); }, [ombiWebhook]);
   useEffect(() => { const id = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(id); }, []);
 
   useEffect(() => {
-    const today = new Date().toDateString();
-    const lastReset = localStorage.getItem("l2_habit_date");
-    if (lastReset !== today) {
+    const todayStr = new Date().toDateString();
+    const lastResetTimestamp = localStorage.getItem("l2_habit_date");
+    const lastResetStr = lastResetTimestamp ? new Date(lastResetTimestamp).toDateString() : null;
+    const needsReset = todayStr !== lastResetStr;
+    if (needsReset) {
       setHabits(prev => prev.map(h => ({ ...h, streak: h.done ? h.streak : 0, done: false })));
-      localStorage.setItem("l2_habit_date", today);
+      localStorage.setItem("l2_habit_date", Date.now().toString());
     }
   }, []);
 
@@ -195,8 +260,14 @@ export default function App() {
         // Audio is optional and may be blocked until the user interacts with the page.
       }
 
-      if (pomoMode === "WORK") {
-        setPomoMode("BREAK"); setPomoSeconds(5 * 60); setUserXp(p => p + 50);
+      const completedMode = pomoMode;
+      const completedDuration = completedMode === "WORK" ? 25 * 60 : 5 * 60;
+      const focusType: FocusEntry["type"] = completedMode === "WORK" ? "work" : "break";
+      setFocusLog(prev => [...prev, { ts: Date.now(), type: focusType, durationSec: completedDuration, completed: true }].slice(-90));
+      if (completedMode === "WORK") {
+        const nextXp = userXp + 50;
+        setPomoMode("BREAK"); setPomoSeconds(5 * 60); setUserXp(nextXp);
+        setXpHistory(prev => [...prev, { ts: Date.now(), xp: nextXp, level: getLevel(nextXp), streak }].slice(-90));
       } else {
         setPomoMode("WORK"); setPomoSeconds(25 * 60);
       }
@@ -222,6 +293,10 @@ export default function App() {
     return `${minutes}:${seconds}`;
   };
 
+  const todayFocus = focusLog.filter(entry => new Date(entry.ts).toDateString() === new Date().toDateString() && entry.completed && entry.type === "work");
+  const todayFocusMinutes = Math.round(todayFocus.reduce((sum, entry) => sum + entry.durationSec, 0) / 60);
+  const xpDelta = xpHistory.length >= 2 ? xpHistory[xpHistory.length - 1].xp - xpHistory[xpHistory.length - 2].xp : null;
+
   const currentLevel = getLevel(userXp);
   const xpRequiredForNext = getXpForNextLevel(currentLevel);
   const xpCurrentLevelBase = getXpForNextLevel(currentLevel - 1);
@@ -236,9 +311,18 @@ export default function App() {
       if (t.id === id) {
         const nextState = !t.done;
         const reward = urgencyScore(t);
-        setUserXp(v => Math.max(0, v + (nextState ? reward : -reward)));
-        setStreak(s => nextState ? s + 1 : Math.max(0, s - 1));
-        return { ...t, done: nextState };
+        const nextXp = Math.max(0, userXp + (nextState ? reward : -reward));
+        const nextStreak = nextState ? streak + 1 : Math.max(0, streak - 1);
+        setUserXp(nextXp);
+        setStreak(nextStreak);
+        setXpHistory(prev => [...prev, { ts: Date.now(), xp: nextXp, level: getLevel(nextXp), streak: nextStreak }].slice(-90));
+        if (!nextState) return { ...t, done: false };
+        const completedAt = Date.now();
+        const completionHistory = [
+          ...(t.completionHistory ?? []),
+          { ts: completedAt, dueDate: t.dueDate, completedOnTime: isCompletedOnTime(t.dueDate, completedAt) },
+        ].slice(-90);
+        return { ...t, done: true, completionHistory };
       }
       return t;
     }));
@@ -253,7 +337,7 @@ export default function App() {
   const saveTask = () => {
     if (!draft.title.trim()) return;
     if (editId) {
-      setTasks(p => p.map(t => t.id === editId ? { ...draft, id: editId, done: t.done } : t)); setEditId(null);
+      setTasks(p => p.map(t => t.id === editId ? { ...draft, id: editId, done: t.done, completionHistory: t.completionHistory } : t)); setEditId(null);
     } else {
       setTasks(p => [...p, { ...draft, id: Date.now(), done: false }]);
     }
@@ -272,6 +356,8 @@ export default function App() {
         streak,
         theme,
         habitDate: localStorage.getItem("l2_habit_date"),
+        xp_history: xpHistory,
+        focus_log: focusLog,
       },
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -298,6 +384,8 @@ export default function App() {
       const nextNotes = typeof backup.data.notes === "string" ? backup.data.notes : "";
       const nextXp = Number.isFinite(backup.data.userXp) ? backup.data.userXp : 0;
       const nextStreak = Number.isFinite(backup.data.streak) ? backup.data.streak : 0;
+      const nextXpHistory = Array.isArray(backup.data.xp_history) ? backup.data.xp_history.slice(-90) : [];
+      const nextFocusLog = Array.isArray(backup.data.focus_log) ? backup.data.focus_log.slice(-90) : [];
 
       setTheme(nextTheme);
       setTasks(nextTasks);
@@ -305,6 +393,8 @@ export default function App() {
       setNotes(nextNotes);
       setUserXp(nextXp);
       setStreak(nextStreak);
+      setXpHistory(nextXpHistory);
+      setFocusLog(nextFocusLog);
       if (backup.data.habitDate) {
         localStorage.setItem("l2_habit_date", backup.data.habitDate);
       } else {
@@ -328,11 +418,25 @@ export default function App() {
     setNotes("// SYSTEM SECURE JOURNAL\n- Fresh local data store initialized.");
     setUserXp(0);
     setStreak(0);
+    setXpHistory([]);
+    setFocusLog([]);
+    setOmbiWebhook("");
     setCatF("All");
     setRankF("All");
     setShowAdd(false);
     setEditId(null);
     setDataStatus("Local LIFE.OS data reset on this browser. Import a backup to recover previous data.");
+  };
+
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleOmbiSync = () => {
+    const message = syncToOMBiWEB({ tasks, habits, notes, userXp, streak, xpHistory, focusLog }, ombiWebhook);
+    setOmbiStatus(message);
+    showToast(message);
   };
 
   const addHabit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -419,6 +523,7 @@ export default function App() {
               </div>
               <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#9ca3af" }}>
                 <span style={{ color:"#f97316", fontWeight:600 }}>🔥 {streak} Day Streak</span>
+                <span style={{fontFamily:"monospace"}}>Δ {xpDelta === null ? "—" : `${xpDelta >= 0 ? "+" : ""}${xpDelta} XP`}</span>
                 <span style={{fontFamily:"monospace"}}>{weather ? `ENV: ${Math.round(weather.temperature)}°C` : "SCANNING REGION..."}</span>
               </div>
             </div>
@@ -432,6 +537,7 @@ export default function App() {
                   <div style={{ fontSize:"10px", color:pomoMode==="WORK"?"#f97316":tc.primary, fontWeight:"bold", letterSpacing:"1px", marginTop:"2px", fontFamily:"monospace" }}>
                     ● STATUS: {pomoMode} LAYER
                   </div>
+                  <div style={{ fontSize:"11px", color:"#9ca3af", marginTop:"6px", fontFamily:"monospace" }}>Today: {todayFocus.length} {todayFocus.length === 1 ? "session" : "sessions"}, {todayFocusMinutes} minutes focus</div>
                 </div>
                 <div style={{ display:"flex", gap:"6px" }}>
                   <button style={G.btn(pomoActive)} onClick={() => setPomoActive(!pomoActive)}>
@@ -471,7 +577,7 @@ export default function App() {
             <div style={G.panel("#06b6d4")}>
               <div style={G.ptitle("#06b6d4")}>// DATA VAULT</div>
               <p style={{ fontSize:"12px", color:"#9ca3af", lineHeight:1.5, marginBottom:"10px" }}>
-                Export before moving browsers or resetting storage. Import restores quests, habits, notes, XP, streak, theme, and habit date.
+                Export before moving browsers or resetting storage. Import restores quests, habits, notes, XP, streak, theme, habit date, XP history, and focus log.
               </p>
               <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"8px" }}>
                 <button style={G.btn(true, "#06b6d4")} onClick={exportLifeOsData}>Export JSON</button>
@@ -554,11 +660,13 @@ export default function App() {
                 {shown.length === 0 && <div style={{fontSize:"12px", color:"#4b5563", paddingBlock:"8px"}}>No matching vector data found.</div>}
                 {shown.map(t => {
                   const d = daysLeft(t.dueDate);
+                  const completionRate = questCompletionRate(t);
                   return (
                     <div key={t.id} style={{ display:"flex", alignItems:"center", gap:"12px", padding:"8px 0", borderBottom:`1px solid #1f2335`, opacity:t.done?0.35:1, transition:"opacity 0.2s" }}>
                       <input type="checkbox" checked={t.done} onChange={() => toggleTask(t.id)} style={{ width:"15px", height:"15px", cursor:"pointer" }} />
                       <span style={{ fontSize:"10px", color:RANK_COLOR[t.rank], fontWeight:"bold", fontFamily:"monospace", background:`${RANK_COLOR[t.rank]}15`, padding:"1px 5px", borderRadius:"3px", width:"14px", textAlign:"center" }}>{t.rank}</span>
                       <span style={{ flex:1, fontSize:"13px", textDecoration:t.done?"line-through":"none", color:t.done?"#4b5563":"#ffffff" }}>{t.title}</span>
+                      {completionRate !== null && <span style={{ fontSize:"10px", color:"#ec4899", background:"rgba(236,72,153,0.12)", border:"1px solid rgba(236,72,153,0.25)", padding:"1px 6px", borderRadius:"999px", fontFamily:"monospace" }}>{completionRate}% on-time</span>}
                       <span style={{ fontSize:"11px", color:"#9ca3af", background:"#161925", padding:"1px 6px", borderRadius:"4px" }}>{t.category}</span>
                       {d !== null && <span style={{ fontSize:"11px", fontFamily:"monospace", color:d<=0?"#ef4444":"#6b7280" }}>{d<=0?"OVERDUE":`${d}d left`}</span>}
                       <button onClick={() => beginEditTask(t)} style={{ background:"transparent", border:"none", color:tc.primary, cursor:"pointer", fontSize:"11px", padding:"0 4px" }}>EDIT</button>
@@ -601,6 +709,32 @@ export default function App() {
           </div>
 
         </div>
+      </div>
+
+      {toast && (
+        <div role="status" style={{ position:"fixed", right:"18px", bottom:ombiOpen ? "210px" : "86px", zIndex:51, background:"#27272a", border:"1px solid rgba(168,85,247,0.45)", color:"#f4f4f5", borderRadius:"8px", padding:"10px 12px", fontSize:"12px", boxShadow:"0 12px 32px rgba(0,0,0,0.45)" }}>
+          {toast}
+        </div>
+      )}
+
+      <div style={{ position:"fixed", right:"18px", bottom:"18px", zIndex:50, width:ombiOpen ? "320px" : "180px", background:"#18181b", border:"1px solid rgba(168,85,247,0.3)", borderRadius:"10px", boxShadow:"0 18px 50px rgba(0,0,0,0.55)", padding:"12px", color:"#e5e7eb" }}>
+        <button onClick={() => setOmbiOpen(open => !open)} style={{ width:"100%", background:"transparent", border:"none", color:"#e5e7eb", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:0 }}>
+          <span style={{ fontSize:"13px", fontWeight:800, letterSpacing:"1px", background:"linear-gradient(90deg, #a855f7, #ec4899, #f97316)", WebkitBackgroundClip:"text", color:"transparent" }}>OMBiWEB ⬡ Node</span>
+          <span style={{ fontSize:"11px", color:"#a855f7" }}>{ombiOpen ? "Hide" : "Show"}</span>
+        </button>
+        {ombiOpen && (
+          <div style={{ marginTop:"10px", display:"grid", gap:"8px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", fontFamily:"monospace", color:"#9ca3af" }}>
+              <span>Connection</span><span style={{ color:"#ef4444" }}>offline</span>
+            </div>
+            <label style={{ display:"grid", gap:"4px", fontSize:"11px", color:"#9ca3af" }}>
+              Webhook URL
+              <input value={ombiWebhook} onChange={e => setOmbiWebhook(e.target.value)} placeholder="https://n8n.example/webhook/..." style={{ ...G.inp, width:"100%", fontSize:"12px" }} />
+            </label>
+            <button onClick={handleOmbiSync} style={{ ...G.btn(true, "#a855f7"), padding:"8px 12px" }}>Sync</button>
+            <div style={{ fontSize:"11px", color:"#6b7280", fontFamily:"monospace", lineHeight:1.4 }}>{ombiStatus}</div>
+          </div>
+        )}
       </div>
     </>
   );
