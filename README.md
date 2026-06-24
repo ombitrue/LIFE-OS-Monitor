@@ -33,7 +33,6 @@ npm start
 ```
 
 The local server prints a URL, usually `http://localhost:4173/`. Open that URL in your browser. Stop it with `Ctrl+C`.
-codex/rework-and-patch-repository-for-functionality-j4eai0
 
 > Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
 
@@ -51,25 +50,6 @@ This writes the static browser app to `dist/`. The output includes `dist/index.h
 npm run typecheck
 ```
 
-
-
-> Source changes are not hot-reloaded. Stop and re-run `npm start` after editing files.
-
-## Build a static local bundle
-
-```bash
-npm run build
-```
-
-This writes the static browser app to `dist/`. The output includes `dist/index.html`, `dist/main.js`, `dist/main.css`, sourcemaps, and copied public assets.
-
-## Type-check only
-
-```bash
-npm run typecheck
-```
-
-main
 Use this when you want TypeScript validation without generating a browser bundle.
 
 ## How local launch works
@@ -79,8 +59,6 @@ Use this when you want TypeScript validation without generating a browser bundle
 - The script copies `index.html` and `public/` into `dist/`.
 - A small Node HTTP server serves `dist/` at `http://localhost:4173/`.
 - `index.html` loads `/main.js`; it does not reference Vite or `/src/main.tsx`.
-
- codex/rework-and-patch-repository-for-functionality-j4eai0
 
 ## Backup, import, and reset local data
 
@@ -93,7 +71,7 @@ LIFE.OS data lives in browser `localStorage`, so the browser profile controls wh
 3. Select **Export JSON**.
 4. Save the downloaded `life-os-backup-YYYY-MM-DD.json` file somewhere safe.
 
-The backup includes quests, habits, notes, XP, streak, theme, and the habit reset date.
+The backup includes quests, habits, notes, XP, streak, theme, the habit reset date, XP history, and focus log entries.
 
 ### Import a backup
 
@@ -115,12 +93,7 @@ Reset clears LIFE.OS `l2_*` keys from the current browser and returns the app to
 
 ## Data and permissions
 
-- LIFE.OS stores data in browser `localStorage` using `l2_*` keys. The in-app DATA VAULT can export, import, or reset those keys intentionally.
-
-## Data and permissions
-
 - LIFE.OS stores data in browser `localStorage` using `l2_*` keys.
-main
 - No backend server or database is required.
 - Weather is optional. If the browser blocks geolocation or the weather request fails, the app continues running and shows the scanning fallback state.
 - Pomodoro audio is optional. Browsers may block audio until the user interacts with the page.
@@ -131,11 +104,7 @@ main
 | --- | --- | --- |
 | `index.html` | Static browser entry document | Defines the root element, favicon, metadata, and local bundle script. |
 | `src/main.tsx` | React bootstrap | Mounts the React app and imports global styles. |
-codex/rework-and-patch-repository-for-functionality-j4eai0
 | `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, data vault export/import/reset, scoring, Pomodoro logic, and UI panels. |
-
-| `src/App.tsx` | LIFE.OS app shell | Contains dashboard state, local persistence, scoring, Pomodoro logic, and UI panels. |
- main
 | `src/index.css` | Global stylesheet | Provides the app reset, dark baseline, sizing, and focus states. |
 | `src/app-env.d.ts` | Browser type extensions | Adds the WebKit audio fallback type. |
 | `scripts/build.mjs` | Production build script | Creates the static `dist/` bundle without Vite. |
@@ -148,3 +117,15 @@ codex/rework-and-patch-repository-for-functionality-j4eai0
 ## Cleaned repository notes
 
 Unused starter template assets and Vite-specific files were removed so the repository only keeps files used by the local React app or its build/launch pipeline.
+
+## OMBiWEB Node integration
+
+LIFE-OS Monitor includes a modular **OMBiWEB Node panel** — a connection point
+for future n8n automation workflows.
+
+The panel (bottom-right corner) allows setting a webhook URL. When configured,
+the `Sync` button will POST the current app state (quests, XP, habits, focus log)
+to your n8n instance for further processing, distribution, or cross-app routing.
+
+Current status: **local-only**. The panel stores the webhook URL in `localStorage`
+and logs sync events. Network sync requires a running n8n instance.
